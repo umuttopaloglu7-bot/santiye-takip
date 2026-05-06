@@ -9,7 +9,8 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const ADMIN_SIFRE = "1954"; 
+const ADMIN_SIFRE = "1881"; // Sisteme giriş şifresi
+const RAPOR_SIFRE = "1954"; // Excel raporu alma şifresi
 
 export default function PuantajYonetim() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -37,7 +38,6 @@ export default function PuantajYonetim() {
 
   useEffect(() => {
     setMounted(true);
-    // Sayfa yenilendiğinde giriş durumunu kontrol et (isteğe bağlı localStorage eklenebilir)
     if (isLoggedIn) {
       verileriGetir();
       const kanal = supabase.channel('pano_takip')
@@ -79,17 +79,18 @@ export default function PuantajYonetim() {
     if (a) setAlanlar(a);
   }
 
-  // ... (Diğer fonksiyonlar: alanEkle, ustaEkle, puantajKaydet, excelIndir aynı kaldı)
   async function alanEkle() {
     if (!yeniAlanAd.trim()) return;
     await supabase.from('alanlar').insert([{ ad: yeniAlanAd.trim() }]);
     setYeniAlanAd(''); setShowAlanModal(false);
   }
+
   async function ustaEkle() {
     if (!yeniUstaAd.trim()) return;
     await supabase.from('ustalar').insert([{ ad: yeniUstaAd.trim(), alan: aktifAlan }]);
     setYeniUstaAd(''); setShowUstaModal(false);
   }
+
   async function puantajKaydet(mesai: string) {
     if (!seciliDetay) return;
     if (mesai === 'sil') {
@@ -99,13 +100,20 @@ export default function PuantajYonetim() {
     }
     setSeciliDetay(null); setNotInput('');
   }
+
+  // RAPOR ŞİFRESİ BURADA KONTROL EDİLİYOR
   const sifreOnayla = () => {
-    if (sifreInput === ADMIN_SIFRE) {
+    if (sifreInput === RAPOR_SIFRE) {
       if (showSifreModal?.tip === 'tekil') excelIndir();
       else if (showSifreModal?.tip === 'genel') genelRaporIndir();
-      setShowSifreModal(null); setSifreInput('');
-    } else { alert("Hatalı!"); setSifreInput(''); }
+      setShowSifreModal(null); 
+      setSifreInput('');
+    } else { 
+      alert("Hatalı Rapor Şifresi!"); 
+      setSifreInput(''); 
+    }
   };
+
   const excelIndir = () => {
     const aktifUstaListesi = ustalar.filter(u => u.alan === aktifAlan);
     const excelVerisi = aktifUstaListesi.map(usta => {
@@ -119,6 +127,7 @@ export default function PuantajYonetim() {
     XLSX.utils.book_append_sheet(wb, ws, "Rapor");
     XLSX.writeFile(wb, `${aktifAlan}_Puantaj.xlsx`);
   };
+
   const genelRaporIndir = () => {
     const genelVeri = alanlar.map(alan => {
       const p = puantajlar.filter(px => px.alan === alan.ad);
@@ -135,7 +144,6 @@ export default function PuantajYonetim() {
 
   if (!mounted) return null;
 
-  // GİRİŞ EKRANI (LOGIN VIEW)
   if (!isLoggedIn) {
     return (
       <main className="min-h-screen bg-[#02040a] flex items-center justify-center p-6">
@@ -173,12 +181,10 @@ export default function PuantajYonetim() {
     );
   }
 
-  // ANA PANO (DASHBOARD VIEW)
   return (
     <main className="min-h-screen bg-[#02040a] text-slate-300 p-6 font-sans uppercase text-[11px]">
       <div className="max-w-[1800px] mx-auto space-y-8">
         
-        {/* Üst Bar / Çıkış Butonu Eklendi */}
         <div className="flex justify-between items-center bg-[#0b101d] p-4 rounded-[1.5rem] border border-slate-800/50">
            <div className="flex items-center gap-3 ml-4">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -189,7 +195,6 @@ export default function PuantajYonetim() {
            </button>
         </div>
 
-        {/* Üst Kartlar */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-[#0b101d] p-8 rounded-[2rem] border border-slate-800/50 flex items-center gap-6 shadow-2xl">
             <div className="bg-blue-600/10 p-4 rounded-2xl text-blue-500"><LayoutDashboard size={28}/></div>
@@ -208,7 +213,6 @@ export default function PuantajYonetim() {
           </button>
         </div>
 
-        {/* Şantiye Seçici */}
         <div className="flex items-center gap-4 bg-[#0b101d] p-4 rounded-[1.5rem] border border-slate-800/50">
           <Construction className="text-blue-500 ml-4" size={24} />
           <div className="flex gap-3 overflow-x-auto no-scrollbar">
@@ -219,7 +223,6 @@ export default function PuantajYonetim() {
           <button onClick={() => setShowAlanModal(true)} className="p-3 bg-blue-600/10 text-blue-500 border border-blue-500/20 rounded-2xl ml-auto mr-4 hover:bg-blue-600 hover:text-white transition-all"><Plus size={24}/></button>
         </div>
 
-        {/* Çizelge */}
         <div className="bg-[#0b101d] rounded-[2.5rem] border border-slate-800/50 overflow-hidden shadow-2xl">
           <div className="p-8 border-b border-slate-800/50 flex justify-between items-center">
             <h2 className="text-2xl font-black text-white italic tracking-tighter">{aktifAlan} <span className="text-blue-500 font-normal opacity-40">/ GÜNLÜK ÇİZELGE</span></h2>
@@ -259,14 +262,15 @@ export default function PuantajYonetim() {
         </div>
       </div>
 
-      {/* MODALLAR (Şifre, Puantaj Seçim, Ekleme Modalları Aynı Tasarımla Devam) */}
       {showSifreModal && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-xl">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] w-full max-w-sm border border-slate-700 shadow-2xl text-center">
             <Lock className="mx-auto mb-6 text-blue-500" size={40}/>
-            <h2 className="text-2xl font-black text-white mb-6 uppercase">YETKİ KONTROLÜ</h2>
-            <input type="password" autoFocus className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white text-center font-black tracking-[1em] outline-none" value={sifreInput} onChange={e => setSifreInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sifreOnayla()}/>
-            <button onClick={sifreOnayla} className="w-full bg-blue-600 p-5 rounded-2xl font-black text-white">ONAYLA</button>
+            <h2 className="text-2xl font-black text-white mb-6 uppercase">RAPOR YETKİSİ</h2>
+            <p className="text-slate-500 text-[9px] mb-4 tracking-widest">LÜTFEN RAPORLAMA ŞİFRESİNİ GİRİN</p>
+            <input type="password" placeholder="••••" autoFocus className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white text-center font-black tracking-[1em] outline-none focus:border-blue-500" value={sifreInput} onChange={e => setSifreInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sifreOnayla()}/>
+            <button onClick={sifreOnayla} className="w-full bg-blue-600 p-5 rounded-2xl font-black text-white hover:bg-blue-500 transition-all">RAPORU HAZIRLA</button>
+            <button onClick={() => {setShowSifreModal(null); setSifreInput('');}} className="mt-4 text-slate-600 text-[10px] font-black hover:text-slate-400">İPTAL ET</button>
           </div>
         </div>
       )}
@@ -285,7 +289,6 @@ export default function PuantajYonetim() {
         </div>
       )}
 
-      {/* Şantiye/Usta Modalları */}
       {showAlanModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] w-full max-w-md border border-slate-700">
@@ -309,7 +312,7 @@ export default function PuantajYonetim() {
       <style jsx global>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .custom-scrollbar::-webkit-scrollbar { height: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { bg: #161b2c; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #161b2c; border-radius: 10px; }
       `}</style>
     </main>
   );
