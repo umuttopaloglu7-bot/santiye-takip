@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, Check, Construction, Calculator, FileSpreadsheet, LayoutDashboard, Users, Lock, LogOut, ShieldCheck, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Check, Construction, Calculator, FileSpreadsheet, LayoutDashboard, Users, Lock, LogOut, ShieldCheck, Trash2, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const supabase = createClient(
@@ -23,12 +23,12 @@ export default function PuantajYonetim() {
   const [aktifAlan, setAktifAlan] = useState<string>('');
   const [mounted, setMounted] = useState(false);
   
-  // Takvim için Ay ve Yıl state'leri
   const [seciliTarih, setSeciliTarih] = useState(new Date());
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const [showAlanModal, setShowAlanModal] = useState(false);
   const [showUstaModal, setShowUstaModal] = useState(false);
-  const [showSifreModal, setShowSifreModal] = useState<{tip: 'tekil' | 'genel'} | null>(null);
+  const [showSifreModal, setShowSifreModal] = useState<{tip: 'aylik' | 'genel_ozet' | 'santiye_tum'} | null>(null);
   const [sifreInput, setSifreInput] = useState('');
   const [seciliDetay, setSeciliDetay] = useState<{usta: string, gun: number} | null>(null);
   const [yeniAlanAd, setYeniAlanAd] = useState('');
@@ -41,7 +41,6 @@ export default function PuantajYonetim() {
   const gunSayisi = new Date(yil, ay, 0).getDate();
   const gunler = Array.from({ length: gunSayisi }, (_, i) => i + 1);
 
-  // Gün ismini döndüren yardımcı fonksiyon
   const getGunAdi = (gun: number) => {
     const d = new Date(yil, ay - 1, gun);
     return d.toLocaleString('tr-TR', { weekday: 'short' });
@@ -58,7 +57,7 @@ export default function PuantajYonetim() {
         .subscribe();
       return () => { supabase.removeChannel(kanal); };
     }
-  }, [isLoggedIn, seciliTarih]); // Tarih değişince verileri tekrar çek
+  }, [isLoggedIn, seciliTarih]);
 
   const ayDegistir = (yon: 'ileri' | 'geri') => {
     const yeni = new Date(seciliTarih);
@@ -142,8 +141,9 @@ export default function PuantajYonetim() {
 
   const sifreOnayla = () => {
     if (sifreInput === RAPOR_SIFRE) {
-      if (showSifreModal?.tip === 'tekil') excelIndir();
-      else if (showSifreModal?.tip === 'genel') genelRaporIndir();
+      if (showSifreModal?.tip === 'aylik') excelIndir();
+      else if (showSifreModal?.tip === 'genel_ozet') genelRaporIndir();
+      else if (showSifreModal?.tip === 'santiye_tum') santiyeTumZamanlarIndir();
       setShowSifreModal(null); setSifreInput('');
     } else { alert("Hatalı!"); setSifreInput(''); }
   };
@@ -162,6 +162,30 @@ export default function PuantajYonetim() {
     XLSX.writeFile(wb, `${aktifAlan}_${ayAdi}_Puantaj.xlsx`);
   };
 
+  const santiyeTumZamanlarIndir = async () => {
+    const { data: tumPuantajlar } = await supabase.from('puantaj').select('*').match({ alan: aktifAlan });
+    const aktifUstaListesi = ustalar.filter(u => u.alan === aktifAlan);
+    
+    const excelVerisi = aktifUstaListesi.map(usta => {
+      const pList = (tumPuantajlar || []).filter(p => p.usta === usta.ad);
+      const tam = pList.filter(p => p.mesai === 'tam').length;
+      const yarim = pList.filter(p => p.mesai === 'yarim').length;
+      return { 
+        "ŞANTİYE": aktifAlan, 
+        "USTA ADI": usta.ad, 
+        "TOPLAM TAM GÜN (TÜM ZAMANLAR)": tam, 
+        "TOPLAM YARIM GÜN (TÜM ZAMANLAR)": yarim, 
+        "GENEL TOPLAM GÜN": tam + (yarim * 0.5),
+        "YEVMİYE": 0,
+        "GENEL HAKEDİŞ": 0
+      };
+    });
+    const ws = XLSX.utils.json_to_sheet(excelVerisi);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Tüm Zamanlar Raporu");
+    XLSX.writeFile(wb, `${aktifAlan}_GENEL_DOKUM.xlsx`);
+  };
+
   const genelRaporIndir = () => {
     const genelVeri = alanlar.map(alan => {
       const p = puantajlar.filter(px => px.alan === alan.ad);
@@ -170,7 +194,7 @@ export default function PuantajYonetim() {
     const ws = XLSX.utils.json_to_sheet(genelVeri);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Genel");
-    XLSX.writeFile(wb, `Genel_Rapor_${ayAdi}.xlsx`);
+    XLSX.writeFile(wb, `Tum_Santiyeler_Ozet.xlsx`);
   };
 
   if (!mounted) return null;
@@ -196,7 +220,6 @@ export default function PuantajYonetim() {
     <main className="min-h-screen bg-[#02040a] text-slate-300 p-6 font-sans uppercase text-[11px]">
       <div className="max-w-[1800px] mx-auto space-y-8">
         
-        {/* Üst Bar ve Takvim Kontrolü */}
         <div className="flex justify-between items-center bg-[#0b101d] p-4 rounded-[1.5rem] border border-slate-800/50">
            <div className="flex items-center gap-6">
               <span className="ml-4 text-[9px] font-black text-slate-500 italic uppercase tracking-widest">SİSTEM ÇEVRİMİÇİ</span>
@@ -222,7 +245,7 @@ export default function PuantajYonetim() {
             <Calculator size={28} className="text-purple-500"/>
             <div><p className="text-slate-500 text-[10px]">{ayAdi.toUpperCase()} GÜN</p><p className="text-3xl font-black text-white">{puantajlar.filter(p => p.mesai === 'tam').length + (puantajlar.filter(p => p.mesai === 'yarim').length * 0.5)}</p></div>
           </div>
-          <button onClick={() => setShowSifreModal({tip: 'genel'})} className="bg-purple-600 p-8 rounded-[2rem] flex items-center justify-center gap-4 text-white font-black hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/20">
+          <button onClick={() => setShowSifreModal({tip: 'genel_ozet'})} className="bg-purple-600 p-8 rounded-[2rem] flex items-center justify-center gap-4 text-white font-black hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/20">
             <Lock size={24}/> GENEL RAPOR
           </button>
         </div>
@@ -243,8 +266,31 @@ export default function PuantajYonetim() {
         <div className="bg-[#0b101d] rounded-[2.5rem] border border-slate-800/50 overflow-hidden shadow-2xl">
           <div className="p-8 border-b border-slate-800/50 flex flex-wrap gap-4 justify-between items-center">
             <h2 className="text-2xl font-black text-white italic">{aktifAlan} <span className="text-blue-500 font-normal opacity-40">/ ÇİZELGE</span></h2>
-            <div className="flex gap-4">
-              <button onClick={() => setShowSifreModal({tip: 'tekil'})} className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-green-500 shadow-lg transition-all"><FileSpreadsheet size={20}/> İNDİR</button>
+            <div className="flex gap-4 relative">
+              <button 
+                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                className="bg-green-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-green-500 shadow-lg transition-all"
+              >
+                <Download size={20}/> İNDİR
+              </button>
+              
+              {showDownloadMenu && (
+                <div className="absolute top-full mt-2 right-0 w-64 bg-[#161b2c] border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                  <button 
+                    onClick={() => { setShowSifreModal({tip: 'aylik'}); setShowDownloadMenu(false); }}
+                    className="w-full text-left px-6 py-4 hover:bg-blue-600 text-white font-bold flex items-center gap-3 border-b border-slate-800/50"
+                  >
+                    <ChevronRight size={16}/> {ayAdi} Raporu
+                  </button>
+                  <button 
+                    onClick={() => { setShowSifreModal({tip: 'santiye_tum'}); setShowDownloadMenu(false); }}
+                    className="w-full text-left px-6 py-4 hover:bg-blue-600 text-white font-bold flex items-center gap-3"
+                  >
+                    <FileText size={16}/> Şantiye Genel (Tüm Ay)
+                  </button>
+                </div>
+              )}
+
               <button onClick={() => setShowUstaModal(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-blue-500 shadow-lg transition-all"><Plus size={20}/> USTA EKLE</button>
             </div>
           </div>
@@ -290,7 +336,6 @@ export default function PuantajYonetim() {
         </div>
       </div>
 
-      {/* Rapor Şifre Modalı */}
       {showSifreModal && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-xl">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 text-center shadow-2xl w-full max-w-sm">
@@ -303,7 +348,6 @@ export default function PuantajYonetim() {
         </div>
       )}
 
-      {/* Puantaj Giriş Modalı */}
       {seciliDetay && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-md">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] w-full max-w-md border border-slate-700 shadow-2xl">
@@ -319,7 +363,6 @@ export default function PuantajYonetim() {
         </div>
       )}
 
-      {/* Şantiye Modal */}
       {showAlanModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
@@ -331,7 +374,6 @@ export default function PuantajYonetim() {
         </div>
       )}
 
-      {/* Usta Modal */}
       {showUstaModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
