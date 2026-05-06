@@ -101,7 +101,6 @@ export default function PuantajYonetim() {
     setSeciliDetay(null); setNotInput('');
   }
 
-  // RAPOR ŞİFRESİ BURADA KONTROL EDİLİYOR
   const sifreOnayla = () => {
     if (sifreInput === RAPOR_SIFRE) {
       if (showSifreModal?.tip === 'tekil') excelIndir();
@@ -114,29 +113,49 @@ export default function PuantajYonetim() {
     }
   };
 
+  // EXCEL DÜZENLEMESİ: image_5d688e.png GÖRSELİNDEKİ YAPI
   const excelIndir = () => {
     const aktifUstaListesi = ustalar.filter(u => u.alan === aktifAlan);
+    
     const excelVerisi = aktifUstaListesi.map(usta => {
       const pList = puantajlar.filter(p => p.usta === usta.ad && p.alan === aktifAlan);
       const tam = pList.filter(p => p.mesai === 'tam').length;
       const yarim = pList.filter(p => p.mesai === 'yarim').length;
-      return { "USTA": usta.ad, "TAM": tam, "YARIM": yarim, "TOPLAM": tam + (yarim * 0.5) };
+      const toplamGun = tam + (yarim * 0.5);
+
+      return { 
+        "ŞANTİYE": aktifAlan,
+        "USTA ADI": usta.ad, 
+        "TAM GÜN": tam, 
+        "YARIM GÜN ÇALIŞMA": yarim, 
+        "TOPLAM GÜN": toplamGun,
+        "YEVMİYE (ELİNLE YAZ)": 0,
+        "TOPLAM HAKEDİŞ": 0 
+      };
     });
+
     const ws = XLSX.utils.json_to_sheet(excelVerisi);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rapor");
-    XLSX.writeFile(wb, `${aktifAlan}_Puantaj.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Hakediş Raporu");
+    XLSX.writeFile(wb, `${aktifAlan}_Hakedis_Raporu.xlsx`);
   };
 
   const genelRaporIndir = () => {
     const genelVeri = alanlar.map(alan => {
       const p = puantajlar.filter(px => px.alan === alan.ad);
-      return { "ŞANTİYE": alan.ad, "USTA": ustalar.filter(u => u.alan === alan.ad).length, "GÜN": p.filter(x => x.mesai === 'tam').length + (p.filter(x => x.mesai === 'yarim').length * 0.5) };
+      const tam = p.filter(x => x.mesai === 'tam').length;
+      const yarim = p.filter(x => x.mesai === 'yarim').length;
+      
+      return { 
+        "ŞANTİYE ADI": alan.ad, 
+        "USTA SAYISI": ustalar.filter(u => u.alan === alan.ad).length, 
+        "TOPLAM GÜN (YEVMİYE)": tam + (yarim * 0.5) 
+      };
     });
     const ws = XLSX.utils.json_to_sheet(genelVeri);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Genel");
-    XLSX.writeFile(wb, `Genel_Rapor.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Genel Özet");
+    XLSX.writeFile(wb, `Genel_Santiye_Raporu.xlsx`);
   };
 
   const [yeniAlanAd, setYeniAlanAd] = useState('');
