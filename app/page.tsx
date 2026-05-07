@@ -14,6 +14,7 @@ const RAPOR_SIFRE = "1954";
 const STANDART_CALISMA_SAATI = 8; 
 
 export default function PuantajYonetim() {
+  // 1. ÖNCE TÜM DEĞİŞKENLERİ (STATE) TANIMLIYORUZ
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginSifre, setLoginSifre] = useState('');
   const [error, setError] = useState(false);
@@ -34,6 +35,7 @@ export default function PuantajYonetim() {
   const [yeniAlanAd, setYeniAlanAd] = useState('');
   const [yeniUstaAd, setYeniUstaAd] = useState('');
 
+  // TARİH HESAPLAMALARI
   const yil = seciliTarih.getFullYear();
   const ay = seciliTarih.getMonth() + 1;
   const ayAdi = seciliTarih.toLocaleString('tr-TR', { month: 'long' });
@@ -45,6 +47,7 @@ export default function PuantajYonetim() {
     return d.toLocaleString('tr-TR', { weekday: 'short' });
   };
 
+  // 2. SONRA FONKSİYONLARI TANIMLIYORUZ
   useEffect(() => {
     setMounted(true);
     if (isLoggedIn) {
@@ -57,17 +60,6 @@ export default function PuantajYonetim() {
       return () => { supabase.removeChannel(kanal); };
     }
   }, [isLoggedIn, seciliTarih]);
-
-  const ayDegistir = (yon: 'ileri' | 'geri') => {
-    const yeni = new Date(seciliTarih);
-    yon === 'ileri' ? yeni.setMonth(yeni.getMonth() + 1) : yeni.setMonth(yeni.getMonth() - 1);
-    setSeciliTarih(yeni);
-  };
-
-  const handleLogin = () => {
-    if (loginSifre === ADMIN_SIFRE) { setIsLoggedIn(true); setError(false); }
-    else { setError(true); setLoginSifre(''); setTimeout(() => setError(false), 2000); }
-  };
 
   async function verileriGetir() {
     const { data: a } = await supabase.from('alanlar').select('*').order('ad');
@@ -83,6 +75,17 @@ export default function PuantajYonetim() {
     const { data: a } = await supabase.from('alanlar').select('*');
     if (p) setPuantajlar(p); if (u) setUstalar(u); if (a) setAlanlar(a);
   }
+
+  const ayDegistir = (yon: 'ileri' | 'geri') => {
+    const yeni = new Date(seciliTarih);
+    yon === 'ileri' ? yeni.setMonth(yeni.getMonth() + 1) : yeni.setMonth(yeni.getMonth() - 1);
+    setSeciliTarih(yeni);
+  };
+
+  const handleLogin = () => {
+    if (loginSifre === ADMIN_SIFRE) { setIsLoggedIn(true); setError(false); }
+    else { setError(true); setLoginSifre(''); setTimeout(() => setError(false), 2000); }
+  };
 
   async function alanEkle() {
     if (!yeniAlanAd.trim()) return;
@@ -117,11 +120,10 @@ export default function PuantajYonetim() {
       await supabase.from('puantaj').delete().match({ usta: seciliDetay.usta, alan: aktifAlan, yil, ay, gun: seciliDetay.gun });
     } else {
       const kayitDegeri = tip === 'tam' ? STANDART_CALISMA_SAATI : tip === 'izin' ? -1 : deger;
-      const { error: upsertError } = await supabase.from('puantaj').upsert({ 
+      await supabase.from('puantaj').upsert({ 
         usta: seciliDetay.usta, alan: aktifAlan, yil, ay, gun: seciliDetay.gun, 
         saat: kayitDegeri
       });
-      if (upsertError) { alert("Hata!"); console.error(upsertError); }
     }
     setSeciliDetay(null); setSaatInput(''); syncVeri();
   }
@@ -140,7 +142,8 @@ export default function PuantajYonetim() {
     const excelVerisi = aktifUstaListesi.map(usta => {
       const pList = puantajlar.filter(p => p.usta === usta.ad && p.alan === aktifAlan);
       const tSaat = pList.reduce((acc, curr) => acc + (curr.saat > 0 ? curr.saat : 0), 0);
-      return { "ŞANTİYE": aktifAlan, "USTA ADI": usta.ad, "TOPLAM SAAT": tSaat, "YEVMİYE": tSaat / STANDART_CALISMA_SAATI };
+      const izinliGun = pList.filter(p => p.saat === -1).length;
+      return { "ŞANTİYE": aktifAlan, "USTA ADI": usta.ad, "TOPLAM SAAT": tSaat, "YEVMİYE": tSaat / STANDART_CALISMA_SAATI, "İZİNLİ GÜN": izinliGun };
     });
     const ws = XLSX.utils.json_to_sheet(excelVerisi);
     const wb = XLSX.utils.book_new();
@@ -154,7 +157,7 @@ export default function PuantajYonetim() {
     const excelVerisi = aktifUstaListesi.map(usta => {
       const pList = (tumPuantajlar || []).filter(p => p.usta === usta.ad);
       const tSaat = pList.reduce((acc, curr) => acc + (curr.saat > 0 ? curr.saat : 0), 0);
-      return { "ŞANTİYE": aktifAlan, "USTA ADI": usta.ad, "TOPLAM SAAT": tSaat, "YEVMİYE": tSaat / STANDART_CALISMA_SAATI };
+      return { "ŞANTİYE": aktifAlan, "USTA ADI": usta.ad, "GENEL TOPLAM SAAT": tSaat, "GENEL YEVMİYE": tSaat / STANDART_CALISMA_SAATI };
     });
     const ws = XLSX.utils.json_to_sheet(excelVerisi);
     const wb = XLSX.utils.book_new();
@@ -183,7 +186,7 @@ export default function PuantajYonetim() {
           <div className="text-center mb-10"><ShieldCheck size={40} className="mx-auto mb-6 text-blue-500"/><h1 className="text-3xl font-black text-white italic">ŞANTİYE TAKİP</h1></div>
           <div className="space-y-6">
             <input type="password" autoFocus placeholder="ŞİFRE" className="w-full bg-[#161b2c] border border-slate-700 p-6 rounded-2xl text-white text-center font-black" value={loginSifre} onChange={(e) => setLoginSifre(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()}/>
-            <button onClick={handleLogin} className="w-full bg-blue-600 p-6 rounded-2xl text-white font-black hover:bg-blue-500 transition-all">GİRİŞ YAP</button>
+            <button onClick={handleLogin} className="w-full bg-blue-600 p-6 rounded-2xl text-white font-black hover:bg-blue-500">GİRİŞ YAP</button>
           </div>
         </div>
       </main>
@@ -193,6 +196,7 @@ export default function PuantajYonetim() {
   return (
     <main className="min-h-screen bg-[#02040a] text-slate-300 p-6 font-sans uppercase text-[11px]">
       <div className="max-w-[1800px] mx-auto space-y-8">
+        {/* Üst Bar */}
         <div className="flex justify-between items-center bg-[#0b101d] p-4 rounded-[1.5rem] border border-slate-800/50">
            <div className="flex items-center gap-6">
               <span className="ml-4 text-[9px] font-black text-slate-500 italic uppercase">SİSTEM ÇEVRİMİÇİ</span>
@@ -205,6 +209,7 @@ export default function PuantajYonetim() {
            <button onClick={() => setIsLoggedIn(false)} className="bg-red-600/10 text-red-500 px-6 py-2 rounded-xl font-black flex items-center gap-2 hover:bg-red-600 hover:text-white transition-all">ÇIKIŞ YAP <LogOut size={16}/></button>
         </div>
 
+        {/* İstatistikler */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-[#0b101d] p-8 rounded-[2rem] border border-slate-800/50 flex items-center gap-6 shadow-2xl">
             <LayoutDashboard size={28} className="text-blue-500"/>
@@ -222,6 +227,7 @@ export default function PuantajYonetim() {
           <button onClick={() => setShowSifreModal({tip: 'genel_ozet'})} className="bg-purple-600 p-8 rounded-[2rem] flex items-center justify-center gap-4 text-white font-black hover:bg-purple-500 transition-all shadow-xl shadow-purple-900/20"><Lock size={24}/> GENEL RAPOR</button>
         </div>
 
+        {/* Şantiyeler */}
         <div className="flex items-center gap-4 bg-[#0b101d] p-4 rounded-[1.5rem] border border-slate-800/50 overflow-x-auto no-scrollbar">
           <Construction className="text-blue-500 ml-4 shrink-0" size={24} />
           <div className="flex gap-2">
@@ -235,6 +241,7 @@ export default function PuantajYonetim() {
           </div>
         </div>
 
+        {/* Ana Çizelge */}
         <div className="bg-[#0b101d] rounded-[2.5rem] border border-slate-800/50 overflow-hidden shadow-2xl">
           <div className="p-8 border-b border-slate-800/50 flex flex-wrap gap-4 justify-between items-center">
             <h2 className="text-2xl font-black text-white italic">{aktifAlan} <span className="text-blue-500 font-normal opacity-40">/ ÇİZELGE</span></h2>
@@ -290,6 +297,7 @@ export default function PuantajYonetim() {
         </div>
       </div>
 
+      {/* Şifre Modalı */}
       {showSifreModal && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-xl">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 text-center shadow-2xl w-full max-w-sm">
@@ -301,6 +309,7 @@ export default function PuantajYonetim() {
         </div>
       )}
 
+      {/* Puantaj Giriş Modalı */}
       {seciliDetay && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-md">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] w-full max-w-md border border-slate-700 shadow-2xl text-center">
@@ -323,21 +332,24 @@ export default function PuantajYonetim() {
         </div>
       )}
 
+      {/* Yeni Şantiye Modalı */}
       {showAlanModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
             <h2 className="text-xl font-black text-white mb-6 italic uppercase text-center">YENİ ŞANTİYE</h2>
-            <input className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white font-black uppercase text-center" placeholder="AD..." value={yeniAlanAd} onChange={e => setYeniAlanAd(e.target.value)} />
+            <input className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white font-black uppercase text-center" placeholder="AD..." value={yeniAlanAd} onChange={(e) => setYeniAlanAd(e.target.value)} />
             <button onClick={alanEkle} className="w-full bg-blue-600 p-5 rounded-2xl font-black text-white hover:bg-blue-500 transition-all">OLUŞTUR</button>
             <button onClick={() => setShowAlanModal(false)} className="mt-4 w-full text-slate-500 font-black text-[10px] uppercase text-center">VAZGEÇ</button>
           </div>
         </div>
       )}
+
+      {/* Yeni Usta Modalı */}
       {showUstaModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
             <h2 className="text-xl font-black text-white mb-6 italic uppercase text-center">YENİ USTA</h2>
-            <input className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white font-black uppercase text-center" placeholder="AD SOYAD..." value={yeniUstaAd} onChange={e => setYeniUstaAd(e.target.value)} />
+            <input className="w-full bg-[#161b2c] border border-slate-700 p-5 rounded-2xl mb-6 text-white font-black uppercase text-center" placeholder="AD SOYAD..." value={yeniUstaAd} onChange={(e) => setYeniUstaAd(e.target.value)} />
             <button onClick={ustaEkle} className="w-full bg-blue-600 p-5 rounded-2xl font-black text-white hover:bg-blue-500 transition-all">KAYDET</button>
             <button onClick={() => setShowUstaModal(false)} className="mt-4 w-full text-slate-500 font-black text-[10px] uppercase text-center">VAZGEÇ</button>
           </div>
