@@ -24,12 +24,16 @@ export default function PuantajYonetim() {
   const [mounted, setMounted] = useState(false);
   const [seciliTarih, setSeciliTarih] = useState(new Date());
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  
+  // MODAL VE INPUT STATE'LERİ
   const [showAlanModal, setShowAlanModal] = useState(false);
   const [showUstaModal, setShowUstaModal] = useState(false);
   const [showSifreModal, setShowSifreModal] = useState<{tip: 'aylik' | 'genel_ozet' | 'santiye_tum'} | null>(null);
   const [sifreInput, setSifreInput] = useState('');
   const [seciliDetay, setSeciliDetay] = useState<{usta: string, gun: number} | null>(null);
   const [saatInput, setSaatInput] = useState<string>('');
+  const [yeniAlanAd, setYeniAlanAd] = useState('');
+  const [yeniUstaAd, setYeniUstaAd] = useState('');
 
   const yil = seciliTarih.getFullYear();
   const ay = seciliTarih.getMonth() + 1;
@@ -114,11 +118,10 @@ export default function PuantajYonetim() {
       await supabase.from('puantaj').delete().match({ usta: seciliDetay.usta, alan: aktifAlan, yil, ay, gun: seciliDetay.gun });
     } else {
       const kayitDegeri = tip === 'tam' ? STANDART_CALISMA_SAATI : tip === 'izin' ? -1 : deger;
-      const { error: upsertError } = await supabase.from('puantaj').upsert({ 
+      await supabase.from('puantaj').upsert({ 
         usta: seciliDetay.usta, alan: aktifAlan, yil, ay, gun: seciliDetay.gun, 
         saat: kayitDegeri, mesai: tip === 'tam' ? 'tam' : tip === 'izin' ? 'izin' : 'ozel'
       });
-      if (upsertError) { alert("Hata oluştu!"); console.error(upsertError); }
     }
     setSeciliDetay(null); setSaatInput(''); syncVeri();
   }
@@ -244,7 +247,7 @@ export default function PuantajYonetim() {
                   <button onClick={() => { setShowSifreModal({tip: 'santiye_tum'}); setShowDownloadMenu(false); }} className="w-full text-left px-6 py-4 hover:bg-blue-600 text-white font-bold">🏗️ Tüm Zamanlar</button>
                 </div>
               )}
-              <button onClick={() => setShowUstaModal(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-blue-500"><Plus size={20}/> USTA EKLE</button>
+              <button onClick={() => setShowUstaModal(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 hover:bg-blue-500 transition-all"><Plus size={20}/> USTA EKLE</button>
             </div>
           </div>
           
@@ -289,6 +292,7 @@ export default function PuantajYonetim() {
         </div>
       </div>
 
+      {/* Şifre Modalı */}
       {showSifreModal && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-xl">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 text-center shadow-2xl w-full max-w-sm">
@@ -300,6 +304,7 @@ export default function PuantajYonetim() {
         </div>
       )}
 
+      {/* Puantaj Giriş Modalı */}
       {seciliDetay && (
         <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[110] backdrop-blur-md">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] w-full max-w-md border border-slate-700 shadow-2xl text-center">
@@ -322,6 +327,7 @@ export default function PuantajYonetim() {
         </div>
       )}
 
+      {/* Şantiye Ekleme Modalı */}
       {showAlanModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
@@ -332,6 +338,8 @@ export default function PuantajYonetim() {
           </div>
         </div>
       )}
+      
+      {/* Usta Ekleme Modalı */}
       {showUstaModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[110]">
           <div className="bg-[#0b101d] p-10 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-sm">
